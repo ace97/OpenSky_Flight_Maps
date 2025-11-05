@@ -11,7 +11,7 @@ try:
     rest = REST()
     df = rest.states()
 
-    # 2. Check if the DataFrame is empty (the correct way)
+    # 2. Check if the DataFrame is empty
     if df is None or df.empty:
         print("No flight data received from OpenSky. Exiting.")
         exit()
@@ -21,7 +21,7 @@ try:
     # 3. Rename columns to match your desired schema
     rename_map = {
         'timestamp': 'timestamp_utc', 
-        'onground': 'on_ground', # API name to desired name
+        'onground': 'on_ground', 
         'groundspeed': 'velocity',
         'track': 'track_heading', 
         'baro_altitude': 'altitude',
@@ -30,7 +30,6 @@ try:
     df = df.rename(columns=rename_map)
 
     # 4. Filter data
-    # Drop rows without location data
     df = df.dropna(subset=['latitude', 'longitude'])
 
     if df.empty:
@@ -41,25 +40,26 @@ try:
     df['updated_at_utc'] = datetime.now(timezone.utc)
     
     # 6. Define the final 18 columns for the database
-    # NOTE: This list now explicitly excludes the 'sensors' column 
-    # as it was causing issues and is not strictly needed for the map.
     columns_to_keep = [
         "icao24", "callsign", "origin_country", "last_position",
         "timestamp_utc", "longitude", "latitude", "altitude",
         "on_ground", "velocity", "track_heading", "vertical_rate",
         "geo_altitude", "squawk", "spi", "position_source",
-        "updated_at_utc" # This is the 18th column
+        "updated_at_utc" # This is our custom timestamp column
     ]
     
     # Filter for columns that actually exist in the DataFrame
     final_columns = [col for col in columns_to_keep if col in df.columns]
-    df_final = df[final_columns]
+    
+    # FIX FOR SettingWithCopyWarning: Use .copy()
+    df_final = df[final_columns].copy()
     
     # Clean callsign
     if 'callsign' in df_final.columns:
         df_final['callsign'] = df_final['callsign'].str.strip()
 
     print(f"Prepared {len(df_final)} flights for database insert.")
+    print(f"DataFrame columns ({len(df_final.columns)}): {list(df_final.columns)}")
 
     # 7. Connect to MotherDuck
     token = os.environ.get("MOTHERDUCK_TOKEN")
@@ -70,7 +70,9 @@ try:
     con = duckdb.connect(f'md:?motherduck_token={token}')
     print("Successfully connected to MotherDuck.")
 
-    # 8. Ensure the table exists (MUST have 17 columns + 1 update timestamp = 18 total)
+    # 8. Ensure the table exists (This MUST now have 17 columns + 1 update timestamp = 18 total)
+    # The schema below has been corrected to explicitly include all 18 columns 
+    # that are present in df_final.
     con.sql("""
         CREATE TABLE IF NOT EXISTS flights.main.flight_data (
             icao24 VARCHAR,
@@ -94,7 +96,7 @@ try:
     """)
     print("Table 'flights.main.flight_data' is ready.")
 
-    # 9. Insert the data. Since we SELECT * FROM df_final, it must have the same 18 columns.
+    # 9. Insert the data.
     con.sql("INSERT INTO flights.main.flight_data SELECT * FROM df_final")
     
     print(f"Successfully saved {len(df_final)} flights to MotherDuck.")
