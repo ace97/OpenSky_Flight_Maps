@@ -16,12 +16,9 @@ st.set_page_config(
 def load_data():
     """Connects to MotherDuck and fetches the *latest* flight data for each aircraft."""
     try:
-        # Use the MOTHERDUCK_TOKEN from Streamlit Secrets
         token = st.secrets["MOTHERDUCK_TOKEN"]
         con = duckdb.connect(f'md:?motherduck_token={token}')
         
-        # SQL Query: Uses a Window Function (ROW_NUMBER) to select only the newest 
-        # (MAX updated_at_utc) record for each unique aircraft (icao24).
         sql_query = """
             WITH RankedFlights AS (
                 SELECT 
@@ -37,7 +34,6 @@ def load_data():
         
         df = con.sql(sql_query).df()
         
-        # Get the last update time from the database
         last_updated_utc = con.sql("SELECT max(updated_at_utc) FROM flights.main.flight_data").fetchone()[0]
         
         con.close()
@@ -52,7 +48,6 @@ df, last_updated = load_data()
 
 display_time = "Never"
 if last_updated:
-    # Ensure datetime object is timezone aware for display
     if isinstance(last_updated, str):
         last_updated = datetime.fromisoformat(last_updated).replace(tzinfo=timezone.utc)
     elif last_updated.tzinfo is None:
@@ -68,7 +63,6 @@ if df.empty:
     st.warning("No flight data is currently available.")
 else:
     # --- Data Cleaning for Plotting ---
-    # Fills nulls in numeric columns to prevent Plotly crashing
     numeric_cols = ['latitude', 'longitude', 'altitude', 'velocity', 'track_heading']
     df[numeric_cols] = df[numeric_cols].fillna(0)
     df['callsign'] = df['callsign'].fillna('N/A')
@@ -76,8 +70,8 @@ else:
     # --- Create the Map ---
     st.subheader("Global Flight Map")
 
-    # Uses px.scatter_geo with 'orthographic' projection for a single, non-duplicating globe view
-    fig = px.scatter_geo(
+    # Reverting to px.scatter_mapbox
+    fig = px.scatter_mapbox(
         df,
         lat="latitude",
         lon="longitude",
@@ -90,28 +84,22 @@ else:
             "longitude": False
         },
         color_discrete_sequence=["#00BFFF"],
-        projection="orthographic", # The key to a single, centered globe
+        zoom=0,
+        center={"lat": 0, "lon": 0},
         height=600,
     )
     
-    # Configure the Geo layout for a clean, full-globe view
-    fig.update_geos(
-        showcoastlines=True,
-        coastlinecolor="Black",
-        showland=True,
-        landcolor="lightgray",
-        showocean=True,
-        oceancolor="lightblue",
-        showsubunits=True,
-        showcountries=True,
-        # Set boundaries explicitly to cover the whole world
-        lataxis_range=[-90, 90],
-        lonaxis_range=[-180, 180]
-    )
-    
+    # *** CRITICAL FIX: Constrain the longitude range for a single, non-repeating map view ***
     fig.update_layout(
-        title_text='Live Global Flight Map',
-        margin={"r": 0, "t": 30, "l": 0, "b": 0},
+        mapbox_style="carto-positron",
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        mapbox={
+            # This 'bounds' property is what tells the map to stop drawing tiles past 180/-180.
+            'bounds': {'lonmin': -180, 'lonmax': 180, 'latmin': -90, 'latmax': 90},
+            # Explicitly set the initial view based on px.scatter_mapbox settings
+            'center': {'lat': 0, 'lon': 0},
+            'zoom': 0, 
+        }
     )
     
     st.plotly_chart(fig, use_container_width=True)
