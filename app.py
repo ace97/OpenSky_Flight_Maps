@@ -12,12 +12,17 @@ st.set_page_config(
 )
 
 # --- Helper Function (load_data) ---
-@st.cache_data(ttl=60)
+# Note: Caching is essential for performance with Streamlit and MotherDuck
+@st.cache_data(ttl=60)  # Cache the data for 60 seconds
 def load_data():
+    """Connects to MotherDuck and fetches the *latest* flight data for each aircraft."""
     try:
+        # Use the MOTHERDUCK_TOKEN from Streamlit Secrets
         token = st.secrets["MOTHERDUCK_TOKEN"]
         con = duckdb.connect(f'md:?motherduck_token={token}')
         
+        # SQL Query: Uses a Window Function (ROW_NUMBER) to select only the newest 
+        # (MAX updated_at_utc) record for each unique aircraft (icao24).
         sql_query = """
             WITH RankedFlights AS (
                 SELECT 
@@ -32,13 +37,15 @@ def load_data():
         """
         
         df = con.sql(sql_query).df()
+        
+        # Get the last update time from the database
         last_updated_utc = con.sql("SELECT max(updated_at_utc) FROM flights.main.flight_data").fetchone()[0]
         
         con.close()
         return df, last_updated_utc
         
     except (duckdb.Error, TypeError, KeyError) as e:
-        st.error(f"Error loading data from MotherDuck: {e}")
+        st.error(f"Error loading data from MotherDuck. Check token and table name. Error: {e}")
         return pd.DataFrame(), None
 
 # --- Load Data and Time Formatting ---
@@ -46,6 +53,7 @@ df, last_updated = load_data()
 
 display_time = "Never"
 if last_updated:
+    # Ensure datetime object is timezone aware for display
     if isinstance(last_updated, str):
         last_updated = datetime.fromisoformat(last_updated).replace(tzinfo=timezone.utc)
     elif last_updated.tzinfo is None:
@@ -81,16 +89,15 @@ else:
             "longitude": False
         },
         color_discrete_sequence=["#00BFFF"],
-        zoom=1,
+        # FIX FOR PERFECT WORLD MAP: Set a low zoom and a 0,0 center
+        zoom=0,
+        center={"lat": 0, "lon": 0},
         height=600,
     )
     
-    # *** CRITICAL FIX: REMOVE THE COMPLEX, ERROR-PRONE 'mapbox' DICTIONARY ***
-    # This relies on the robust 'mapbox_style' keyword argument.
     fig.update_layout(
         mapbox_style="carto-positron",
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        # REMOVED: mapbox={'layer_mapping': {'wrap': True}}
     )
     
     st.plotly_chart(fig, use_container_width=True)
