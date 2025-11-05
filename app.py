@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import duckdb
-from datetime import datetime, timezone # Use timezone to handle time properly
+from datetime import datetime, timezone 
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -12,11 +12,10 @@ st.set_page_config(
 )
 
 # --- Helper Function ---
-@st.cache_data(ttl=60)  # Cache the data for 60 seconds
+@st.cache_data(ttl=60) # Cache the data for 60 seconds
 def load_data():
     """Connects to MotherDuck and fetches the *latest* flight data."""
     try:
-        # NOTE: Using timezone import from my previous snippet to ensure robust time handling
         token = st.secrets["MOTHERDUCK_TOKEN"]
         con = duckdb.connect(f'md:?motherduck_token={token}')
         
@@ -52,8 +51,9 @@ df, last_updated = load_data()
 
 display_time = "Never"
 if last_updated:
-    # Ensure timezone awareness for display if not already set (copied from my prior robust code)
+    # Ensure timezone awareness for display
     if isinstance(last_updated, str):
+        # Ensure we use timezone.utc from the import
         last_updated = datetime.fromisoformat(last_updated).replace(tzinfo=timezone.utc)
     elif last_updated.tzinfo is None:
         last_updated = last_updated.replace(tzinfo=timezone.utc)
@@ -67,7 +67,7 @@ st.markdown(f"Displaying data from OpenSky. Last Data Point: **{display_time}**"
 if df.empty:
     st.warning("No flight data is currently available.")
 else:
-    # --- CRITICAL FIX: HANDLE NULL VALUES FOR PLOTTING ---
+    # --- Data Cleaning for Plotting ---
     numeric_cols = ['latitude', 'longitude', 'altitude', 'velocity', 'track_heading']
     df[numeric_cols] = df[numeric_cols].fillna(0)
     df['callsign'] = df['callsign'].fillna('N/A')
@@ -75,7 +75,7 @@ else:
     # --- Create the Map ---
     st.subheader("Global Flight Map")
 
-    # *** FINAL FIX: Switch to px.scatter_geo to get a clean, single, non-repeating world map ***
+    # Use px.scatter_geo for a clean, single, non-repeating world map
     fig = px.scatter_geo(
         df,
         lat="latitude",
@@ -89,11 +89,11 @@ else:
             "longitude": False
         },
         color_discrete_sequence=["#00BFFF"],
-        projection="natural earth", # Use a common global projection (like the one in your image)
+        projection="natural earth", # Use a common global projection
         height=600,
     )
     
-    # Configure the Geo layout to style the map (similar to carto-positron aesthetics)
+    # Configure the Geo layout to style the map
     fig.update_geos(
         showocean=True,
         oceancolor="lightblue",
@@ -105,7 +105,10 @@ else:
         countrycolor="DarkGray",
         # Ensure the whole world is shown
         lataxis_range=[-90, 90],
-        lonaxis_range=[-180, 180]
+        lonaxis_range=[-180, 180],
+        # Remove the subplot background color/frame
+        bgcolor='rgba(0,0,0,0)',
+        framecolor='rgba(0,0,0,0)'
     )
 
     fig.update_layout(
