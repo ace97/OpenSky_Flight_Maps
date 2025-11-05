@@ -70,6 +70,8 @@ else:
     # --- Create the Map ---
     st.subheader("Global Flight Map") 
 
+    # Note: We must use a recognized style like 'white-bg' here,
+    # and then override the background with a layer.
     fig = px.scatter_mapbox(
         df,
         lat="latitude",
@@ -88,19 +90,27 @@ else:
         height=600,
     )
     
-    # --- Step 1: Apply simple layout update (margins only)
+    # *** FINAL ROBUST FIX: Use dedicated 'layers' for token-free map tiles. ***
+    # This avoids the fragile bounds/style keys that were crashing update_mapboxes/update_layout.
     fig.update_layout(
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-    )
-
-    # *** FINAL FIX: Use the dedicated update_mapboxes() method ***
-    # This prevents the general update_layout call from crashing and applies the bounds fix.
-    fig.update_mapboxes(
-        style="open-street-map", # Use token-free style
-        # This 'bounds' property stops the map from duplicating tiles past 180/-180.
-        bounds={'lonmin': -180, 'lonmax': 180, 'latmin': -90, 'latmax': 90},
-        center={'lat': 0, 'lon': 0},
-        zoom=0, 
+        mapbox_style="white-bg", # Start with a neutral style
+        mapbox={
+            'layers': [{
+                # This uses the OpenStreetMap URL template to load the tiles
+                'sourcetype': 'raster',
+                'source': [
+                    "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                ],
+                'below': 'traces' # Keep the map layer under the flight data
+            }],
+            'center': {'lat': 0, 'lon': 0},
+            'zoom': 0,
+            # CRITICAL: Set the domain to force the map to render only once.
+            'domain': {'x': [0, 1], 'y': [0, 1]}
+        }
     )
     
     st.plotly_chart(fig, use_container_width=True)
