@@ -12,7 +12,6 @@ st.set_page_config(
 )
 
 # --- Helper Function (load_data) ---
-# Note: Caching is essential for performance with Streamlit and MotherDuck
 @st.cache_data(ttl=60)  # Cache the data for 60 seconds
 def load_data():
     """Connects to MotherDuck and fetches the *latest* flight data for each aircraft."""
@@ -69,6 +68,7 @@ if df.empty:
     st.warning("No flight data is currently available.")
 else:
     # --- Data Cleaning for Plotting ---
+    # Fills nulls in numeric columns to prevent Plotly crashing
     numeric_cols = ['latitude', 'longitude', 'altitude', 'velocity', 'track_heading']
     df[numeric_cols] = df[numeric_cols].fillna(0)
     df['callsign'] = df['callsign'].fillna('N/A')
@@ -76,7 +76,8 @@ else:
     # --- Create the Map ---
     st.subheader("Global Flight Map")
 
-    fig = px.scatter_mapbox(
+    # Uses px.scatter_geo with 'orthographic' projection for a single, non-duplicating globe view
+    fig = px.scatter_geo(
         df,
         lat="latitude",
         lon="longitude",
@@ -89,15 +90,28 @@ else:
             "longitude": False
         },
         color_discrete_sequence=["#00BFFF"],
-        # FIX FOR PERFECT WORLD MAP: Set a low zoom and a 0,0 center
-        zoom=0,
-        center={"lat": 0, "lon": 0},
+        projection="orthographic", # The key to a single, centered globe
         height=600,
     )
     
+    # Configure the Geo layout for a clean, full-globe view
+    fig.update_geos(
+        showcoastlines=True,
+        coastlinecolor="Black",
+        showland=True,
+        landcolor="lightgray",
+        showocean=True,
+        oceancolor="lightblue",
+        showsubunits=True,
+        showcountries=True,
+        # Set boundaries explicitly to cover the whole world
+        lataxis_range=[-90, 90],
+        lonaxis_range=[-180, 180]
+    )
+    
     fig.update_layout(
-        mapbox_style="carto-positron",
-        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        title_text='Live Global Flight Map',
+        margin={"r": 0, "t": 30, "l": 0, "b": 0},
     )
     
     st.plotly_chart(fig, use_container_width=True)
