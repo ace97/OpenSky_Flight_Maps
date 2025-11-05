@@ -70,7 +70,6 @@ else:
     # --- Create the Map ---
     st.subheader("Global Flight Map")
 
-    # Reverting to px.scatter_mapbox
     fig = px.scatter_mapbox(
         df,
         lat="latitude",
@@ -89,14 +88,17 @@ else:
         height=600,
     )
     
-    # *** CRITICAL FIX: Constrain the longitude range for a single, non-repeating map view ***
+    # *** FINAL FIX: Combine all mapbox settings into the 'mapbox' dictionary
+    # and REMOVE the 'mapbox_style' keyword argument to prevent the update error. ***
     fig.update_layout(
-        mapbox_style="carto-positron",
+        # REMOVED: mapbox_style="carto-positron", 
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
         mapbox={
-            # This 'bounds' property is what tells the map to stop drawing tiles past 180/-180.
+            # Setting the style inside the dict
+            'style': "carto-positron", 
+            # This 'bounds' property forces the map to stop drawing tiles past 180/-180.
             'bounds': {'lonmin': -180, 'lonmax': 180, 'latmin': -90, 'latmax': 90},
-            # Explicitly set the initial view based on px.scatter_mapbox settings
+            # Explicitly set the initial view
             'center': {'lat': 0, 'lon': 0},
             'zoom': 0, 
         }
