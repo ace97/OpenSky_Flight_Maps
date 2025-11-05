@@ -88,17 +88,14 @@ else:
         height=600,
     )
     
-    # *** FINAL FIX: Combine all mapbox settings into the 'mapbox' dictionary
-    # and REMOVE the 'mapbox_style' keyword argument to prevent the update error. ***
+    # *** FINAL WORKING MAP FIX: Use token-free style and explicit bounds ***
     fig.update_layout(
-        # REMOVED: mapbox_style="carto-positron", 
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
         mapbox={
-            # Setting the style inside the dict
-            'style': "carto-positron", 
-            # This 'bounds' property forces the map to stop drawing tiles past 180/-180.
+            # USE OPEN-SOURCE, TOKEN-FREE STYLE
+            'style': "open-street-map", 
+            # This 'bounds' property stops the map from duplicating tiles past 180/-180.
             'bounds': {'lonmin': -180, 'lonmax': 180, 'latmin': -90, 'latmax': 90},
-            # Explicitly set the initial view
             'center': {'lat': 0, 'lon': 0},
             'zoom': 0, 
         }
