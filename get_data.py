@@ -109,7 +109,8 @@ try:
     # This prevents the Binder Error by telling DuckDB exactly where each column goes.
     insert_cols = ", ".join(final_columns)
     
-    con.sql(f"INSERT INTO flights.main.flight_data ({insert_cols}) SELECT * FROM df_final")
+    insert_query = f"INSERT INTO flights.main.flight_data ({insert_cols}) SELECT {insert_cols} FROM df_final"
+    con.sql(insert_query)
     
     print(f"Successfully saved {len(df_final)} flights to MotherDuck.")
     con.close()
