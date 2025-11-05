@@ -68,7 +68,7 @@ else:
     df['callsign'] = df['callsign'].fillna('N/A')
     
     # --- Create the Map ---
-    st.subheader("Global Flight Map")
+    st.subheader("Global Flight Map") 
 
     fig = px.scatter_mapbox(
         df,
@@ -88,17 +88,19 @@ else:
         height=600,
     )
     
-    # *** FINAL WORKING MAP FIX: Use token-free style and explicit bounds ***
+    # --- Step 1: Apply simple layout update (margins only)
     fig.update_layout(
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        mapbox={
-            # USE OPEN-SOURCE, TOKEN-FREE STYLE
-            'style': "open-street-map", 
-            # This 'bounds' property stops the map from duplicating tiles past 180/-180.
-            'bounds': {'lonmin': -180, 'lonmax': 180, 'latmin': -90, 'latmax': 90},
-            'center': {'lat': 0, 'lon': 0},
-            'zoom': 0, 
-        }
+    )
+
+    # *** FINAL FIX: Use the dedicated update_mapboxes() method ***
+    # This prevents the general update_layout call from crashing and applies the bounds fix.
+    fig.update_mapboxes(
+        style="open-street-map", # Use token-free style
+        # This 'bounds' property stops the map from duplicating tiles past 180/-180.
+        bounds={'lonmin': -180, 'lonmax': 180, 'latmin': -90, 'latmax': 90},
+        center={'lat': 0, 'lon': 0},
+        zoom=0, 
     )
     
     st.plotly_chart(fig, use_container_width=True)
