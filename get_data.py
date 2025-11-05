@@ -19,20 +19,17 @@ try:
     print(f"Received {len(df)} total states from API.")
 
     # 3. Rename columns to match your desired schema
-    # The API gives names like 'onground', but your code expects 'on_ground'.
     rename_map = {
-        'timestamp': 'timestamp_utc', # 'timestamp' is a reserved SQL word
-        'onground': 'on_ground',
+        'timestamp': 'timestamp_utc', 
+        'onground': 'on_ground', # API name to desired name
         'groundspeed': 'velocity',
-        'track': 'track_heading', # 'track' can also be a reserved word
+        'track': 'track_heading', 
         'baro_altitude': 'altitude',
         'geoaltitude': 'geo_altitude'
     }
     df = df.rename(columns=rename_map)
 
-    # 4. Filter data (e.g., remove on-ground planes if you want)
-    # df = df[df['on_ground'] == False] # Uncomment this line to filter
-    
+    # 4. Filter data
     # Drop rows without location data
     df = df.dropna(subset=['latitude', 'longitude'])
 
@@ -41,16 +38,17 @@ try:
         exit()
 
     # 5. Add our own 'updated_at_utc' timestamp
-    # This tracks when *our script* ran
     df['updated_at_utc'] = datetime.now(timezone.utc)
     
-    # 6. Select only the columns you specified
+    # 6. Define the final 18 columns for the database
+    # NOTE: This list now explicitly excludes the 'sensors' column 
+    # as it was causing issues and is not strictly needed for the map.
     columns_to_keep = [
         "icao24", "callsign", "origin_country", "last_position",
         "timestamp_utc", "longitude", "latitude", "altitude",
         "on_ground", "velocity", "track_heading", "vertical_rate",
-        "sensors", "geo_altitude", "squawk", "spi", "position_source",
-        "updated_at_utc"
+        "geo_altitude", "squawk", "spi", "position_source",
+        "updated_at_utc" # This is the 18th column
     ]
     
     # Filter for columns that actually exist in the DataFrame
@@ -72,9 +70,7 @@ try:
     con = duckdb.connect(f'md:?motherduck_token={token}')
     print("Successfully connected to MotherDuck.")
 
-    # 8. Ensure the table exists (makes the script safe to run anytime)
-    # Using your desired table name 'flights.main.flight_data'
-    # This will only run if the table doesn't already exist.
+    # 8. Ensure the table exists (MUST have 17 columns + 1 update timestamp = 18 total)
     con.sql("""
         CREATE TABLE IF NOT EXISTS flights.main.flight_data (
             icao24 VARCHAR,
@@ -89,7 +85,6 @@ try:
             velocity DOUBLE,
             track_heading DOUBLE,
             vertical_rate DOUBLE,
-            sensors VARCHAR,
             geo_altitude DOUBLE,
             squawk VARCHAR,
             spi BOOLEAN,
@@ -99,7 +94,7 @@ try:
     """)
     print("Table 'flights.main.flight_data' is ready.")
 
-    # 9. Use your INSERT statement
+    # 9. Insert the data. Since we SELECT * FROM df_final, it must have the same 18 columns.
     con.sql("INSERT INTO flights.main.flight_data SELECT * FROM df_final")
     
     print(f"Successfully saved {len(df_final)} flights to MotherDuck.")
