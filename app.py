@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import duckdb
-from datetime import datetime
+from datetime import datetime, timezone # Use timezone to handle time properly
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -12,10 +12,11 @@ st.set_page_config(
 )
 
 # --- Helper Function ---
-@st.cache_data(ttl=60)  # Cache the data for 60 seconds
+@st.cache_data(ttl=60)  # Cache the data for 60 seconds
 def load_data():
     """Connects to MotherDuck and fetches the *latest* flight data."""
     try:
+        # NOTE: Using timezone import from my previous snippet to ensure robust time handling
         token = st.secrets["MOTHERDUCK_TOKEN"]
         con = duckdb.connect(f'md:?motherduck_token={token}')
         
@@ -42,7 +43,8 @@ def load_data():
         return df, last_updated_utc
         
     except (duckdb.Error, TypeError, KeyError) as e:
-        print(f"Error loading data: {e}")
+        # Changed print to st.error for better Streamlit display
+        st.error(f"Error loading data from MotherDuck: {e}")
         return pd.DataFrame(), None
 
 # --- Load Data ---
@@ -50,8 +52,12 @@ df, last_updated = load_data()
 
 display_time = "Never"
 if last_updated:
+    # Ensure timezone awareness for display if not already set (copied from my prior robust code)
     if isinstance(last_updated, str):
-        last_updated = datetime.fromisoformat(last_updated)
+        last_updated = datetime.fromisoformat(last_updated).replace(tzinfo=timezone.utc)
+    elif last_updated.tzinfo is None:
+        last_updated = last_updated.replace(tzinfo=timezone.utc)
+        
     display_time = last_updated.strftime('%Y-%m-%d %I:%M:%S %p UTC')
 
 # --- Main Application ---
@@ -62,19 +68,15 @@ if df.empty:
     st.warning("No flight data is currently available.")
 else:
     # --- CRITICAL FIX: HANDLE NULL VALUES FOR PLOTTING ---
-    # Plotly/Streamlit crashes if it encounters NaN in columns used for plotting.
     numeric_cols = ['latitude', 'longitude', 'altitude', 'velocity', 'track_heading']
-    
-    # Fill NaN values in critical numeric columns with 0
     df[numeric_cols] = df[numeric_cols].fillna(0)
-    
-    # Fill missing callsigns with a default string
     df['callsign'] = df['callsign'].fillna('N/A')
     
     # --- Create the Map ---
     st.subheader("Global Flight Map")
 
-    fig = px.scatter_mapbox(
+    # *** FINAL FIX: Switch to px.scatter_geo to get a clean, single, non-repeating world map ***
+    fig = px.scatter_geo(
         df,
         lat="latitude",
         lon="longitude",
@@ -87,12 +89,26 @@ else:
             "longitude": False
         },
         color_discrete_sequence=["#00BFFF"],
-        zoom=1,
+        projection="natural earth", # Use a common global projection (like the one in your image)
         height=600,
     )
     
+    # Configure the Geo layout to style the map (similar to carto-positron aesthetics)
+    fig.update_geos(
+        showocean=True,
+        oceancolor="lightblue",
+        showland=True,
+        landcolor="lightgray",
+        showcoastlines=True,
+        coastlinecolor="DarkGray",
+        showcountries=True,
+        countrycolor="DarkGray",
+        # Ensure the whole world is shown
+        lataxis_range=[-90, 90],
+        lonaxis_range=[-180, 180]
+    )
+
     fig.update_layout(
-        mapbox_style="carto-positron",
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
     )
     
