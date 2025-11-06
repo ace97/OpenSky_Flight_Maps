@@ -156,4 +156,4 @@ else:
     # --- Show Raw Data ---
     with st.expander("Show Latest State for Filtered Flights"):
         # Display the filtered DataFrame, explicitly removing the internal 'rn' column
-        st.dataframe(df_final.drop(columns=['rn']))
+        st.dataframe(df_final)
