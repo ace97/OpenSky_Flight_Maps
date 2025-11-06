@@ -48,18 +48,18 @@ This is the complete frontend web application. Its job is to:
 
 - Load the `MOTHERDUCK_TOKEN` from Streamlit Secrets.
 - Connect to the MotherDuck database.
-- Run a SQL window function (`ROW_NUMBER() OVER...`) to fetch only the single latest record for each unique aircraft (`icao24`).
+- Run a SQL query to fetch only the latest record from DWH.
 - Handle data cleaning for visualization (e.g., filling `NaN` values).
 - Provide interactive filters for **Country of Origin** and **Call Sign**.
-- Display the final, filtered data on a `plotly.express.scatter_geo` map, which provides a clean, non-repeating global view.
-- Display the raw (filtered) data in an expandable section.
+- Display the final, filtered data on a `plotly.express.scatter_geo` map, which provides a clean global view.
+- Display the latest(filtered) raw data in an expandable section.
 
 ### 3. `.github/workflows/fly.yml`
 
 This is the GitHub Actions workflow file that automates our data pipeline.
 
 - `on: workflow_dispatch:` Allows you to run the job manually from the GitHub "Actions" tab.
-- `on: schedule: - cron: '*/15 * * * *'` Automatically triggers the script to run every 15 minutes.
+- `on: schedule: - cron: '15 */2 * * *'` Automatically triggers the script to run every 2 hour (15 minutes past the hour).
 - It checks out the code, sets up Python, installs dependencies from `requirements.txt`, and finally runs the `get_data.py` script with the `MOTHERDUCK_TOKEN` provided as an environment variable.
 
 ### 4. `requirements.txt`
