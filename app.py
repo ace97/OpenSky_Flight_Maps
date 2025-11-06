@@ -21,16 +21,10 @@ def load_data():
         
         # --- SQL Query to get the latest state for each aircraft ---
         sql_query = """
-            WITH RankedFlights AS (
-                SELECT 
-                    *,
-                    ROW_NUMBER() OVER(
-                        PARTITION BY icao24 
-                        ORDER BY updated_at_utc DESC
-                    ) as rn
-                FROM flights.main.flight_data
-            )
-            SELECT * FROM RankedFlights WHERE rn = 1
+            select *
+            from flights.main.flight_data
+            where updated_at_utc = 
+            (select max(updated_at_utc) from flights.main.flight_data)
         """
         
         df = con.sql(sql_query).df()
